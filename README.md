@@ -45,7 +45,7 @@
 1. Проверить с офисного VPN: `chatgpt.com`, `notebook.google.com`, `promptgather.io`, `arena.ai`, `gamma.app`, `isalin84.github.io`.
 2. Узнать тариф ChatGPT у группы. Скиллы работают на Business/Enterprise; на Plus и Free в тетради описан запасной путь через Проект.
 3. Прогнать на своём аккаунте скилл «Предварительная смета» на брифе и концепции «Полярная ночь».
-4. Сгенерировать иллюстрации по `../_tools/illustration_prompts.md` и обрезать скриптом. Тетрадь работает и без них.
+4. Иллюстрации готовы (13 слотов, 26.10.2026). Перегенерировать картинку: PNG в `../_tools/illustrations_src/` под тем же именем, затем `_tools/.venv/bin/python _tools/crop_illustrations.py`.
 
 ## Что спрятано в данных
 
