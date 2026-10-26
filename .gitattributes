@@ -1,0 +1,6 @@
+# CSV раздаются участникам и открываются в Excel на Windows.
+# Переводы строк не трогаем: git не должен нормализовать CRLF в LF.
+*.csv -text
+*.xlsx binary
+*.png binary
+*.pdf binary
