@@ -12,8 +12,9 @@
 | Путь | Что это |
 |---|---|
 | `index.html` | Тетрадь: контент, движок баллов, звуки, посадочный талон-сертификат |
-| `tablo.html` | Табло ведущего: вставить коды участников, рейтинг, проектор с победителями |
+| `tablo.html` | Табло ведущего: вставить коды участников, рейтинг, проектор с победителями. На проекторе пробел или кликер открывают 3-е и 2-е место, потом 1-е: барабанная дробь, на ударе тарелки фанфары, салют и аплодисменты. Повторное нажатие во время дроби сразу показывает победителя, M выключает звук |
 | `assets/` | Логотип Аэроклуба, шрифты Harmonia, иллюстрации блоков, скиллы |
+| `assets/sfx/` | Звуки финала табло с Pixabay (Pixabay Content License): барабанная дробь [278576](https://pixabay.com/sound-effects/musical-drum-roll-sound-effect-278576/), фанфары [Main Library - Super Fanfare](https://pixabay.com/sound-effects/musical-main-library-super-fanfare-276484/), аплодисменты [236786](https://pixabay.com/sound-effects/people-applause-cheer-236786/), аккорд мест [146260](https://pixabay.com/sound-effects/musical-brass-fanfare-with-timpani-and-winchimes-reverberated-146260/). Обрезаны и выровнены по громкости |
 | `assets/skills/` | `humanwriter.zip`, учебные `aeroclub-tour-brand.zip` и `smeta-predvaritelnaya.zip`, README по установке |
 | `data/` | Учебные файлы. Всё вымышлено: клиенты, площадки, подрядчики, люди |
 | `examples/` | Эталонный локальный дашборд проектов и анонимайзер Аэроклуб Тур |
