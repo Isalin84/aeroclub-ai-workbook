@@ -1005,16 +1005,18 @@ var LEVELS=[
 var CODES={'ТРАП':30,'ТУРБУЛЕНТНОСТЬ':30,'ЭКИПАЖ':30,'ЭШЕЛОН':30,'АВТОПИЛОТ':30};
 /* Раскладки ЙЦУКЕН и QWERTY посимвольно. "LLM" на русской раскладке даёт "ддь",
    и человек в зале не поймёт, почему слово не берётся, - поэтому проверяем оба
-   варианта. Заодно прощаем регистр, Ё вместо Е и лишние пробелы. */
-var KB_LAT="qwertyuiop[]asdfghjkl;'zxcvbnm,.";
-var KB_CYR="йцукенгшщзхъфывапролджэячсмитьбю";
+   варианта. Заодно прощаем регистр, Ё вместо Е, пробелы и знаки вокруг слова:
+   iPhone сам ставит точку после двойного пробела, а с Shift на латинице Э и Ж
+   превращаются в " и :. */
+var KB_LAT="qwertyuiop[]asdfghjkl;'zxcvbnm,.{}:\"<>`~";
+var KB_CYR="йцукенгшщзхъфывапролджэячсмитьбюхъжэбюёё";
 function kbSwap(s){
   return String(s).split('').map(function(c){
     var i=KB_LAT.indexOf(c); if(i>=0)return KB_CYR.charAt(i);
     var j=KB_CYR.indexOf(c); if(j>=0)return KB_LAT.charAt(j);
     return c }).join('');
 }
-function normCode(s){ return String(s==null?'':s).replace(/\s+/g,'').toUpperCase().replace(/Ё/g,'Е') }
+function normCode(s){ return String(s==null?'':s).toUpperCase().replace(/Ё/g,'Е').replace(/[^A-ZА-Я]/g,'') }
 function codeMatch(raw){
   var a=normCode(raw), b=normCode(kbSwap(String(raw==null?'':raw).toLowerCase()));
   return Object.keys(CODES).filter(function(k){ var n=normCode(k); return n===a||n===b })[0];
@@ -1033,8 +1035,30 @@ function load(){ if(!PERSIST)return;
       ['profile','done','bonus','data'].forEach(function(k){ if(o[k])S[k]=o[k] });
       if(S.profile&&S.profile.exp&&!S.profile.about){ S.profile.about=S.profile.exp; delete S.profile.exp }
       S.started=o.started||null } }catch(e){} }
+/* Тетрадь могут открыть в двух вкладках: старая осталась с 27.10, новая открыта 29.10.
+   Перед записью подмешиваем то, что уже сохранила другая вкладка: баллы - по максимуму,
+   бонусы, ответы и поля профиля - если у нас их нет. Иначе старая вкладка молча
+   затёрла бы баллы второго дня. */
+function mergeStored(){
+  var raw=localStorage.getItem(KEY); if(!raw)return;
+  var o; try{ o=JSON.parse(raw) }catch(e){ return }
+  if(!o||typeof o!=='object')return;
+  var k;
+  for(k in o.done||{}) if((+o.done[k]||0)>(+S.done[k]||0)) S.done[k]=+o.done[k];
+  for(k in o.bonus||{}) if(!S.bonus[k]) S.bonus[k]=o.bonus[k];
+  for(k in o.data||{}) if(S.data[k]===undefined) S.data[k]=o.data[k];
+  for(k in o.profile||{}) if(!S.profile[k]) S.profile[k]=o.profile[k];
+  if(o.started&&(!S.started||o.started<S.started)) S.started=o.started;
+}
 function save(){ if(!PERSIST)return;
-  try{ localStorage.setItem(KEY,JSON.stringify(S)) }catch(e){ PERSIST=false; warnStorage() } }
+  try{ mergeStored(); localStorage.setItem(KEY,JSON.stringify(S)) }catch(e){ PERSIST=false; warnStorage() } }
+/* Другая вкладка что-то сохранила - когда участник вернётся сюда, перечитываем страницу,
+   чтобы на экране были свежие ответы, а не вчерашние. */
+var staleTab=false;
+window.addEventListener('storage',function(e){ if(e.key===KEY)staleTab=true });
+function reloadIfStale(){ if(staleTab&&!document.hidden){ staleTab=false; location.reload() } }
+document.addEventListener('visibilitychange',reloadIfStale);
+window.addEventListener('focus',reloadIfStale);
 var warned=false;
 function warnStorage(){
   if(warned)return; warned=true;
@@ -1047,8 +1071,14 @@ function warnStorage(){
   var top=document.getElementById('top');
   top.parentNode.insertBefore(d,top.nextSibling);
 }
-function base(){ var s=0; for(var k in S.done)s+=S.done[k]; return s }
-function bonus(){ var s=0; for(var k in S.bonus)s+=S.bonus[k]; return s }
+/* Считаем только задания, которые есть в тетради сейчас, и не больше их цены.
+   В S.done могут лежать баллы за задание из первой версии (например, improve),
+   которого больше нет: в коде для табло их быть не должно. */
+function base(){ var s=0;
+  BLOCKS.forEach(function(b){ b.tasks.forEach(function(t){
+    if(t.id&&t.pts) s+=Math.min(t.pts,+S.done[t.id]||0) }) });
+  return s }
+function bonus(){ var s=0; for(var k in S.bonus)s+=(+S.bonus[k]||0); return s }
 function total(){ return base()+bonus() }
 function levelObj(){ var r=Math.min(1,base()/MAX),L=LEVELS[0];
   LEVELS.forEach(function(l){ if(r>=l.from)L=l }); return L }
@@ -1752,6 +1782,20 @@ RENDER.formula=function(el,task){
 };
 
 /* ------------------------ поиск закономерностей в файле ------------------------ */
+/* Бриф, смету и договоры по заданию грузят в ChatGPT, файлы учебные. Нейросеть цитирует
+   из них реквизиты: ООО, ИНН и ОГРН, телефон и почту контакта, а из сметы - дробь
+   вида 98.40000000000001. Это не утечка, поэтому перед проверкой вырезаем ровно эти
+   строки. Чужие телефоны, ФИО и номера фильтр по-прежнему ловит. */
+var TRAINING_DATA=[
+  /(ООО|АО|ЗАО|ПАО)\s*[«"„]\s*(Лесные Дали|Технополис Софт|Эвент Сервис Групп)/gi,
+  /\b(5000000001|7700000002|1000000000001|1000000000002)\b/g,
+  /\+?[78]?\s*\(?495\)?[\s-]*555[\s-]*01[\s-]*42/g,
+  /m\.sergeeva@tehnopolis-soft\.example[\w.]*/gi,
+  /\d+[.,]\d{9,}/g
+];
+function stripTraining(raw){
+  return TRAINING_DATA.reduce(function(t,re){ return t.replace(re,' ') },String(raw||''));
+}
 RENDER.keycheck=function(el,task){
   el.innerHTML='<h3>'+esc(task.title)+'</h3><p>'+task.what+'</p>'+
    (task.anon?'<label class="chk" style="margin:4px 0 12px"><input type="checkbox" data-a="anon_'+task.id+'"><span>'+(task.anonTxt||'Я удалил колонки с ФИО, e-mail и телефонами перед загрузкой файла')+'</span></label>':'')+
@@ -1767,7 +1811,7 @@ RENDER.keycheck=function(el,task){
     var raw=get('kc_'+task.id,'')||'', v=norm(raw);
     if(v.length<20){ toast('Вставьте то, что нашла нейросеть'); return }
     if(task.anon&&!get('anon_'+task.id,0)){ toast(task.anonMsg||'Сначала подтвердите, что убрали ФИО из файла - это часть задания'); return }
-    var leak=PII.filter(function(p){return p.re.test(raw)});
+    var leak=PII.filter(function(p){return p.re.test(task.anon?raw:stripTraining(raw))});
     if(leak.length){
       el.querySelector('#kres').innerHTML='<div class="exp bad on"><b>Стоп.</b> В ответе нейросети есть '+leak.map(function(h){return h.n}).join(', ')+
         '. Значит, файл ушёл в чат с персональными данными. Удалите колонки, загрузите заново и вставьте новый ответ.</div>';
